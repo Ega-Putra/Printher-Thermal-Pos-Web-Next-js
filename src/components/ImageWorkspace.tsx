@@ -14,6 +14,7 @@ export default function ImageWorkspace() {
     const [mode, setMode] = useState<ProcessMode>('bw');
     const [threshold, setThreshold] = useState<number>(128);
     const [rotation, setRotation] = useState<number>(0);
+    const [paperSize, setPaperSize] = useState<number>(384); // 384px (58mm), 576px (80mm), 800px (100mm)
     const [isPrinting, setIsPrinting] = useState(false);
 
     // Cropper state
@@ -95,7 +96,7 @@ export default function ImageWorkspace() {
             sourceH = croppedAreaPixels.height;
         }
 
-        // Target dimensions with max 384px width for thermal
+        // Target dimensions
         let width = sourceW;
         let height = sourceH;
 
@@ -105,14 +106,10 @@ export default function ImageWorkspace() {
             height = sourceW;
         }
 
-        if (width > 384) {
-            const scale = 384 / width;
-            width = 384;
-            height = Math.floor(height * scale);
-        } else {
-            width = Math.round(width);
-            height = Math.round(height);
-        }
+        // Auto scale to fill paper size precisely
+        const scale = paperSize / width;
+        width = paperSize;
+        height = Math.round(height * scale);
 
         if (width <= 0 || height <= 0) return;
 
@@ -136,7 +133,7 @@ export default function ImageWorkspace() {
 
         // Process image for thermal view (B&W or Dithering)
         processCanvasForThermal(ctx, width, height, mode, threshold);
-    }, [originalImage, rotation, mode, threshold, croppedAreaPixels, isCropMode]);
+    }, [originalImage, rotation, mode, threshold, croppedAreaPixels, isCropMode, paperSize]);
 
     useEffect(() => {
         drawCanvas();
@@ -192,6 +189,33 @@ export default function ImageWorkspace() {
                 {/* Toolbar */}
                 <div className="col-span-1 flex flex-col gap-6 bg-gray-900 border border-gray-800 p-6 rounded-2xl shadow-2xl">
                     <h3 className="text-xl font-semibold text-white tracking-tight">Editor Tools</h3>
+
+                    <div className="flex flex-col gap-3">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Paper Size</span>
+                        <div className="flex bg-gray-900 border border-gray-700 rounded-lg overflow-hidden p-1">
+                            <button
+                                onClick={() => setPaperSize(384)}
+                                disabled={isCropMode}
+                                className={`flex items-center justify-center flex-1 py-1.5 text-xs font-medium transition-all rounded-md ${paperSize === 384 ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                            >
+                                58mm
+                            </button>
+                            <button
+                                onClick={() => setPaperSize(576)}
+                                disabled={isCropMode}
+                                className={`flex items-center justify-center flex-1 py-1.5 text-xs font-medium transition-all rounded-md ${paperSize === 576 ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                            >
+                                80mm
+                            </button>
+                            <button
+                                onClick={() => setPaperSize(800)}
+                                disabled={isCropMode}
+                                className={`flex items-center justify-center flex-1 py-1.5 text-xs font-medium transition-all rounded-md ${paperSize === 800 ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                            >
+                                100mm
+                            </button>
+                        </div>
+                    </div>
 
                     <div className="flex flex-col gap-3">
                         <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Transform</span>
