@@ -141,8 +141,9 @@ class PrinterService {
                 await writer.write(data);
                 writer.releaseLock();
             } else if (this.type === 'web-bluetooth' && this.webBluetoothCharacteristic) {
-                // BLE Maximum Transmission Unit (MTU) differs, chunking is usually required
-                const maxChunk = 256;
+                // BLE Maximum Transmission Unit (MTU) differ, chunking is highly required.
+                // Windows Chrome BLE stack often fails with "GATT operation failed" if chunks are > 100 bytes or written too fast.
+                const maxChunk = 100;
                 for (let i = 0; i < data.length; i += maxChunk) {
                     const chunk = data.slice(i, i + maxChunk);
                     if (this.webBluetoothCharacteristic.properties.writeWithoutResponse) {
@@ -150,6 +151,8 @@ class PrinterService {
                     } else {
                         await this.webBluetoothCharacteristic.writeValue(chunk);
                     }
+                    // Small delay prevents queue saturation on Windows
+                    await new Promise(r => setTimeout(r, 10));
                 }
             }
         }
