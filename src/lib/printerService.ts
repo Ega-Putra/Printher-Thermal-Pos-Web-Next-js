@@ -142,17 +142,36 @@ class PrinterService {
                 writer.releaseLock();
             } else if (this.type === 'web-bluetooth' && this.webBluetoothCharacteristic) {
                 // BLE Maximum Transmission Unit (MTU) differ, chunking is highly required.
-                // Windows Chrome BLE stack often fails with "GATT operation failed" if chunks are > 100 bytes or written too fast.
-                const maxChunk = 100;
+                // Windows Chrome BLE stack often fails with "GATT operation failed" or drops packets silently 
+                // if we spam writeWithoutResponse. We must prioritize "write with response" (ACK) if supported.
+                const maxChunk = 256;
                 for (let i = 0; i < data.length; i += maxChunk) {
                     const chunk = data.slice(i, i + maxChunk);
-                    if (this.webBluetoothCharacteristic.properties.writeWithoutResponse) {
-                        await this.webBluetoothCharacteristic.writeValueWithoutResponse(chunk);
-                    } else {
-                        await this.webBluetoothCharacteristic.writeValue(chunk);
+
+                    if (this.webBluetoothCharacteristic.properties.write) {
+                        try {
+                            if (typeof this.webBluetoothCharacteristic.writeValueWithResponse === 'function') {
+                                await this.webBluetoothCharacteristic.writeValueWithResponse(chunk);
+                            } else {
+                                await this.webBluetoothCharacteristic.writeValue(chunk);
+                            }
+                        } catch (e) {
+                            // Fallback if the standard API fails
+                            await this.webBluetoothCharacteristic.writeValue(chunk);
+                        }
+                    } else if (this.webBluetoothCharacteristic.properties.writeWithoutResponse) {
+                        try {
+                            if (typeof this.webBluetoothCharacteristic.writeValueWithoutResponse === 'function') {
+                                await this.webBluetoothCharacteristic.writeValueWithoutResponse(chunk);
+                            } else {
+                                await this.webBluetoothCharacteristic.writeValue(chunk);
+                            }
+                        } catch (e) {
+                            await this.webBluetoothCharacteristic.writeValue(chunk);
+                        }
+                        // Need longer delay for withoutResponse to avoid silent packet drop queue overflow on Windows
+                        await new Promise(r => setTimeout(r, 30));
                     }
-                    // Small delay prevents queue saturation on Windows
-                    await new Promise(r => setTimeout(r, 10));
                 }
             }
         }
